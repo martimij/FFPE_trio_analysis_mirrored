@@ -48,13 +48,16 @@ write.csv(QC_portal_trios, file = "/home/mmijuskovic/FFPE_trio_analysis/QC_all62
 ### Function that extracts variant information from json files and calculates concordance between FF and FFPE
 compareSNV <- function(patientID, var_freq = NULL){
   
+  # Get patientID
+  ID <- patientID
+  
   # Get json paths
   ff_path <- QC_portal_trios %>% filter(PATIENT_ID == patientID, SAMPLE_TYPE == "FF") %>% .$json_path
   ffpe_path <- QC_portal_trios %>% filter(PATIENT_ID == patientID, SAMPLE_TYPE == "FFPE") %>% .$json_path
   
   ### Read json files: get chromosome, position, VAF, tier, etc
+  
   # FF
-  #ff_json <- fromJSON("LP2000907-DNA_F02_tiering.json", flatten = T) 
   ff_json <- fromJSON(ff_path, flatten = T)
   ff <- ff_json %>% dplyr::select(
     reportedVariantCancer.chromosome, reportedVariantCancer.position, reportedVariantCancer.reference, reportedVariantCancer.alternate, 
@@ -69,7 +72,6 @@ compareSNV <- function(patientID, var_freq = NULL){
   })
 
   # FFPE
-  #ffpe_json <- fromJSON("LP2000906-DNA_H01_tiering.json", flatten = T)
   ffpe_json <- fromJSON(ffpe_path, flatten = T)
   ffpe <- ffpe_json %>% dplyr::select(
     reportedVariantCancer.chromosome, reportedVariantCancer.position, reportedVariantCancer.reference, reportedVariantCancer.alternate, 
@@ -109,6 +111,16 @@ compareSNV <- function(patientID, var_freq = NULL){
     ffpe <- ffpe %>% filter(VAF > var_freq)
   }
   
+  # Write the table with filtered variants
+  if (dim(ff)[1] != 0) {
+    ff$SAMPLE_TYPE <- "FF"}
+  if (dim(ffpe)[1] != 0) {
+    ffpe$SAMPLE_TYPE <- "FFPE"
+  }
+  all <- rbind(ff, ffpe)
+  all$class <- as.character(all$class)
+  write.table(all, file = paste0(ID, "_SNVs_", var_freq, ".tsv"), sep = "\t", row.names = F, col.names = T, quote = F)
+  
   # Summary table with concordance
   result <- data.frame(FF_TOTAL = dim(ff)[1],
                        FFPE_TOTAL = dim(ffpe)[1],
@@ -118,7 +130,6 @@ compareSNV <- function(patientID, var_freq = NULL){
                        RECALL = ((sum(ff$KEY %in% ffpe$KEY))/(dim(ff)[1])),
                        PRECISION = (sum(ff$KEY %in% ffpe$KEY))/(dim(ffpe)[1]))
 
- #write.table(result, file = paste0(patientID, "_SNV_concord", ".tsv"), row.names = F, quote = F, sep = "\t")
  return(result)
 }
 
@@ -126,7 +137,7 @@ compareSNV <- function(patientID, var_freq = NULL){
 patientIDs <- as.character(unique(QC_portal_trios$PATIENT_ID))
 
 # Run SNV comparison for each patient ID (all allele frequencies)
-SNV_summary <- lapply(patientIDs, compareSNV)  # errors :/ " no applicable method for 'select_' applied to an object of class "list""
+SNV_summary <- lapply(patientIDs, compareSNV)
 SNV_summary <- bind_rows(SNV_summary)
 SNV_summary$PATIENT_ID <- patientIDs
 
@@ -142,6 +153,7 @@ lapply(freq, function(x){
   SNV_summary$PATIENT_ID <- patientIDs
   write.csv(SNV_summary, file = paste0("SNV_summary_62trios_", x, "_", today, ".csv"), row.names = F, quote = F)
 })
+
 
 # NOTE that file "allFreq" and "0" are slightly different
 
