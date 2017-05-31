@@ -1,0 +1,86 @@
+{
+ "cancerSamples": [
+  {
+   "tnm_stage_version": null, 
+   "tmn_stage_grouping": null, 
+   "tumorType": "Colorectal", 
+   "grade": null, 
+   "labId": "1022194121", 
+   "sampleType": "tumor", 
+   "sampleId": "LP3000135-DNA_B04", 
+   "gelPhase": "MAIN", 
+   "tumorSubType": "adenocarcinoma", 
+   "phase": null, 
+   "tumorContent": "medium", 
+   "sampleDiagnosis": null, 
+   "preservationMethod": "FFPE", 
+   "method": null, 
+   "cellularity": null
+  }, 
+  {
+   "tnm_stage_version": null, 
+   "tmn_stage_grouping": null, 
+   "tumorType": "Colorectal", 
+   "grade": null, 
+   "labId": "1022194134", 
+   "sampleType": "tumor", 
+   "sampleId": "LP3000119-DNA_F04", 
+   "gelPhase": "MAIN", 
+   "tumorSubType": "adenocarcinoma", 
+   "phase": null, 
+   "tumorContent": "high", 
+   "sampleDiagnosis": null, 
+   "preservationMethod": "FF", 
+   "method": null, 
+   "cellularity": null
+  }, 
+  {
+   "tnm_stage_version": null, 
+   "tmn_stage_grouping": null, 
+   "tumorType": null, 
+   "grade": null, 
+   "labId": "1022194203", 
+   "sampleType": "germline", 
+   "sampleId": "LP3000114-DNA_C03", 
+   "gelPhase": "MAIN", 
+   "tumorSubType": null, 
+   "phase": null, 
+   "tumorContent": null, 
+   "sampleDiagnosis": null, 
+   "preservationMethod": "BLOOD", 
+   "method": null, 
+   "cellularity": null
+  }
+ ], 
+ "cancerDemographics": {
+  "sampleId": null, 
+  "consentStatus": {
+   "primaryFindingConsent": true, 
+   "carrierStatusConsent": false, 
+   "programmeConsent": true, 
+   "secondaryFindingConsent": false
+  }, 
+  "center": "RTH", 
+  "labkeyParticipantId": "217000058", 
+  "additionalInformation": null, 
+  "dataModelVersion": "v2.4", 
+  "sex": "F", 
+  "primaryDiagnosis": null, 
+  "centerPatientId": "217000058", 
+  "gelId": "217000058", 
+  "assignedICD10": null
+ }, 
+ "versionControl": {
+  "GitVersionControl": "2.1.0"
+ }, 
+ "matchedSamples": [
+  {
+   "germlineSampleId": "LP3000114-DNA_C03", 
+   "tumorSampleId": "LP3000119-DNA_F04"
+  }, 
+  {
+   "germlineSampleId": "LP3000114-DNA_C03", 
+   "tumorSampleId": "LP3000135-DNA_B04"
+  }
+ ]
+}

@@ -1,0 +1,86 @@
+{
+  "cancerSamples": [
+    {
+      "tnm_stage_version": null,
+      "tmn_stage_grouping": null,
+      "tumorType": "BREAST",
+      "grade": null,
+      "labId": "2000009291",
+      "sampleType": "tumor",
+      "sampleId": "LP2000848-DNA_G01",
+      "gelPhase": "OXFORD",
+      "tumorSubType": null,
+      "phase": null,
+      "tumorContent": null,
+      "sampleDiagnosis": null,
+      "preservationMethod": "FF",
+      "method": null,
+      "cellularity": null
+    },
+    {
+      "tnm_stage_version": null,
+      "tmn_stage_grouping": null,
+      "tumorType": null,
+      "grade": null,
+      "labId": "2000009292",
+      "sampleType": "germline",
+      "sampleId": "LP2000842-DNA_A07",
+      "gelPhase": "OXFORD",
+      "tumorSubType": null,
+      "phase": null,
+      "tumorContent": null,
+      "sampleDiagnosis": null,
+      "preservationMethod": "GL",
+      "method": null,
+      "cellularity": null
+    },
+    {
+      "tnm_stage_version": null,
+      "tmn_stage_grouping": null,
+      "tumorType": "BREAST",
+      "grade": null,
+      "labId": "2000009293",
+      "sampleType": "tumor",
+      "sampleId": "LP2000844-DNA_F01",
+      "gelPhase": "OXFORD",
+      "tumorSubType": null,
+      "phase": null,
+      "tumorContent": null,
+      "sampleDiagnosis": null,
+      "preservationMethod": "FFPE",
+      "method": null,
+      "cellularity": null
+    }
+  ],
+  "cancerDemographics": {
+    "sampleId": null,
+    "consentStatus": {
+      "primaryFindingConsent": true,
+      "carrierStatusConsent": false,
+      "programmeConsent": true,
+      "secondaryFindingConsent": false
+    },
+    "center": "OXFORD",
+    "labkeyParticipantId": "200000929",
+    "additionalInformation": null,
+    "dataModelVersion": "v2.4",
+    "sex": null,
+    "primaryDiagnosis": null,
+    "centerPatientId": "200000929",
+    "gelId": "200000929",
+    "assignedICD10": null
+  },
+  "versionControl": {
+    "GitVersionControl": "2.1.0"
+  },
+  "matchedSamples": [
+    {
+      "germlineSampleId": "LP2000842-DNA_A07",
+      "tumorSampleId": "LP2000848-DNA_G01"
+    },
+    {
+      "germlineSampleId": "LP2000842-DNA_A07",
+      "tumorSampleId": "LP2000844-DNA_F01"
+    }
+  ]
+}
