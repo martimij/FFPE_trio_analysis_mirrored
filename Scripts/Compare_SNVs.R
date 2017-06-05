@@ -214,4 +214,123 @@ zero_200000335 %>% filter(KEY == "1_21480128_T_C")
 
 
 
+############# Calculate SNV concordance removing low VAF recurrent variants ############# 
+
+# Load the table with recurrent variants and mean VAFs (created in SNV_plots.R)
+#recurr <- read.table("./Data/SNV/var_recurrent_unique.tsv", sep = "\t", header = T) # local
+recurr <- read.table("/home/mmijuskovic/FFPE_trio_analysis/SNV_trio_comparison/var_recurrent_unique.tsv", sep = "\t", header = T)
+
+# Get KEYs of variants with VAF < 0.1
+recurr_keys <- as.character(recurr %>% filter(MEAN_VAF < 0.1) %>% .$KEY)  # 240 variants
+
+# Calculate concordance again, removing recurrent variants, no variant tables written
+compareSNV_2 <- function(patientID, var_freq = NULL){
+  
+  # Get patientID
+  ID <- patientID
+  
+  # Get json paths
+  ff_path <- QC_portal_trios %>% filter(PATIENT_ID == patientID, SAMPLE_TYPE == "FF") %>% .$json_path
+  ffpe_path <- QC_portal_trios %>% filter(PATIENT_ID == patientID, SAMPLE_TYPE == "FFPE") %>% .$json_path
+  
+  ### Read json files: get chromosome, position, VAF, tier, etc
+  
+  # FF
+  ff_json <- fromJSON(ff_path, flatten = T)
+  ff <- ff_json %>% dplyr::select(
+    reportedVariantCancer.chromosome, reportedVariantCancer.position, reportedVariantCancer.reference, reportedVariantCancer.alternate, 
+    reportedVariantCancer.VAF, somaticOrGermline)
+  # Reduce to somatic, remove that column
+  ff <- ff %>% filter(somaticOrGermline == "somatic") %>% dplyr::select(-(somaticOrGermline))
+  ff$tier <- sapply(1:dim(ff)[1], function(x){
+    ff_json$reportedVariantCancer.reportEvents[[x]]$tier})
+  ff$class <- sapply(1:dim(ff)[1], function(x){
+    ff_json$reportedVariantCancer.reportEvents[[x]]$soNames})
+  names(ff) <- c("chr", "pos", "ref", "alt", "VAF", "tier", "class")
+  ff$KEY <- sapply(1:dim(ff)[1], function(x){
+    paste(ff$chr[x], ff$pos[x], ff$ref[x], ff$alt[x], sep = "_")
+  })
+  
+  # FFPE
+  ffpe_json <- fromJSON(ffpe_path, flatten = T)
+  ffpe <- ffpe_json %>% dplyr::select(
+    reportedVariantCancer.chromosome, reportedVariantCancer.position, reportedVariantCancer.reference, reportedVariantCancer.alternate, 
+    reportedVariantCancer.VAF, somaticOrGermline)
+  # Reduce to somatic, remove that column
+  ffpe <- ffpe %>% filter(somaticOrGermline == "somatic") %>% dplyr::select(-(somaticOrGermline))
+  ffpe$tier <- sapply(1:dim(ffpe)[1], function(x){
+    ffpe_json$reportedVariantCancer.reportEvents[[x]]$tier})
+  ffpe$class <- sapply(1:dim(ffpe)[1], function(x){
+    ffpe_json$reportedVariantCancer.reportEvents[[x]]$soNames})
+  names(ffpe) <- c("chr", "pos", "ref", "alt", "VAF", "tier", "class")
+  ffpe$KEY <- sapply(1:dim(ffpe)[1], function(x){
+    paste(ffpe$chr[x], ffpe$pos[x], ffpe$ref[x], ffpe$alt[x], sep = "_")
+  }) 
+  
+  # # Sanity check (!!! found duplicates - traced the error to the tiering pipeline)
+  # sum(duplicated(ff))  #33  # after OpenCGA fix -> 1
+  # sum(duplicated(ff$KEY))  #37  # after OpenCGA fix -> 1
+  # # Checking the leftover duplicate
+  # dup_key <- ff[duplicated(ff$KEY),]$KEY
+  # ff %>% filter(KEY == dup_key)
+  
+  # Deduplicate
+  ff <- ff[!duplicated(ff),]
+  ffpe <- ffpe[!duplicated(ffpe),]
+  
+  # # Check duplicate keys
+  # sum(duplicated(ff$KEY))
+  # sum(duplicated(ffpe$KEY))
+  # ff %>% filter(KEY %in% (ff[duplicated(ff$KEY),]$KEY))
+  
+  # Deduplicate variants with same keys
+  ff <- ff[(!duplicated(ff$KEY)),]
+  ffpe <- ffpe[(!duplicated(ffpe$KEY)),]
+  
+  # Subset the variants by frequency if frequency argument is provided
+  if (!is.null(var_freq)) {
+    ff <- ff %>% filter(VAF > var_freq)
+    ffpe <- ffpe %>% filter(VAF > var_freq)
+  }
+  
+  # # Write the table with filtered variants
+  # if (dim(ff)[1] != 0) {
+  #   ff$SAMPLE_TYPE <- "FF"}
+  # if (dim(ffpe)[1] != 0) {
+  #   ffpe$SAMPLE_TYPE <- "FFPE"
+  # }
+  # all <- rbind(ff, ffpe)
+  # all$class <- as.character(all$class)
+  # write.table(all, file = paste0(ID, "_SNVs_", var_freq, ".tsv"), sep = "\t", row.names = F, col.names = T, quote = F)
+  
+  # Remove RECURRENT variants (VAF < 0.1)
+  ff <- ff %>% filter(!KEY %in% recurr_keys)
+  ffpe <- ffpe %>% filter(!KEY %in% recurr_keys)
+  
+  # Summary table with concordance
+  result <- data.frame(FF_TOTAL = dim(ff)[1],
+                       FFPE_TOTAL = dim(ffpe)[1],
+                       OVERLAP = sum(ff$KEY %in% ffpe$KEY), # bug
+                       FF_UNIQ = ((dim(ff)[1]) - sum(ff$KEY %in% ffpe$KEY)),
+                       FFPE_UNIQ = ((dim(ffpe)[1]) - sum(ff$KEY %in% ffpe$KEY)),
+                       RECALL = ((sum(ff$KEY %in% ffpe$KEY))/(dim(ff)[1])),
+                       PRECISION = (sum(ff$KEY %in% ffpe$KEY))/(dim(ffpe)[1]))
+  
+  return(result)
+}
+
+# Get all patient IDs
+patientIDs <- as.character(unique(QC_portal_trios$PATIENT_ID))
+
+
+# Run with different variant frequency thresholds
+freq <- seq(from = 0, to = 0.3, by = 0.05)
+lapply(freq, function(x){
+  SNV_summary <- lapply(patientIDs, compareSNV_2, var_freq = x)
+  SNV_summary <- bind_rows(SNV_summary)
+  SNV_summary$PATIENT_ID <- patientIDs
+  write.csv(SNV_summary, file = paste0("SNV_summary_62trios_noRecurr_", x, "_", today, ".csv"), row.names = F, quote = F)
+})
+
+
 
