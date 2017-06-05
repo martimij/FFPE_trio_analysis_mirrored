@@ -342,8 +342,50 @@ dev.off()
 ################ FF vs FFPE VAF plot ################ 
 
 # Load all somatic variants in FF and FFPE for BRC patient 200000306 (FF = LP2000407-DNA_A01, FFPE = LP2000418-DNA_A01)
+ff <- read.table("./Data/SNV/LP2000407-DNA_A01-info.txt", sep = "\t")
+ffpe <- read.table("./Data/SNV/LP2000418-DNA_A01-info.txt", sep = "\t")
+names(ff) <- c("chr", "pos", "ref", "alt", "VAF")
+names(ffpe) <- c("chr", "pos", "ref", "alt", "VAF")
+ff$GROUP <- "FF"
+ffpe$GROUP <- "FFPE"
+
+# Create keys to compare variants
+ff$chr <- sub("chr", "", ff$chr)
+ffpe$chr <- sub("chr", "", ffpe$chr)
+ff$KEY <- sapply(1:dim(ff)[1], function(x){
+  paste(ff$chr[x], ff$pos[x], ff$ref[x], ff$alt[x], sep = "_")
+})
+ffpe$KEY <- sapply(1:dim(ffpe)[1], function(x){
+  paste(ffpe$chr[x], ffpe$pos[x], ffpe$ref[x], ffpe$alt[x], sep = "_")
+})
+
+# Merge FF and FFPE
+ff_ffpe <- rbind(ff, ffpe)
+
+# Plot VAF distribution for the whole genome variants
+# Draw histogram with lines at Illumina purity estimate, save plot
+pdf(file = paste0("./Plots/Purity_VAF/200000306_VAF_purity_allVariants.pdf"))
+print(ggplot(ff_ffpe, aes(x = VAF, fill = factor(GROUP))) + 
+        geom_histogram(alpha = 0.5, position = "identity") + 
+        geom_vline(xintercept = ((QC %>% filter(PATIENT_ID == "200000306", SAMPLE_TYPE == "FF") %>% .$TUMOUR_PURITY)/100), col = "coral", size = 1) + 
+        geom_vline(xintercept = ((QC %>% filter(PATIENT_ID == "200000306", SAMPLE_TYPE == "FFPE") %>% .$TUMOUR_PURITY)/100), col = "cyan3", size = 1) +
+        scale_x_continuous(limits = c(0, 1), breaks = seq(0,1,0.1)) +
+        theme(legend.position = "top") +
+        blank)
+dev.off()
 
 
+# Summarize by KEY (set NAs to zero); KEY in rows, VAF_FF and VAF_FFPE in columns
+
+
+
+# Recast by KEY
+ff_ffpe_m <- melt(ff_ffpe, id = c("KEY", "GROUP"), measure.vars = "VAF")
+ff_ffpe_m <- cast(ff_ffpe_m, KEY ~ GROUP, value)
+
+
+# Plot VAF, FF vs FFPE
+ggplot(ff_ffpe, aes(x=VAF_FF, y=VAF_FFPE)) + geom_jitter()
 
 
 
