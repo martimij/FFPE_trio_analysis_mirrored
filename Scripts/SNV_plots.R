@@ -376,31 +376,159 @@ dev.off()
 
 
 # Summarize by KEY (set NAs to zero); KEY in rows, VAF_FF and VAF_FFPE in columns
-
-
-
-# Recast by KEY
-ff_ffpe_m <- melt(ff_ffpe, id = c("KEY", "GROUP"), measure.vars = "VAF")
-ff_ffpe_m <- cast(ff_ffpe_m, KEY ~ GROUP, value)
+names(ff)[5] <- "VAF_FF"
+names(ffpe)[5] <- "VAF_FFPE"
+vaf_table <- full_join((ff %>% select(KEY, VAF_FF)), (ffpe %>% select(KEY, VAF_FFPE)), by = "KEY")
+vaf_table[is.na(vaf_table$VAF_FF),]$VAF_FF <- 0
+vaf_table[is.na(vaf_table$VAF_FFPE),]$VAF_FFPE <- 0
 
 
 # Plot VAF, FF vs FFPE
-ggplot(ff_ffpe, aes(x=VAF_FF, y=VAF_FFPE)) + geom_jitter()
-
+pdf(file = paste0("./Plots/Purity_VAF/200000306_VAF_allVariants.pdf"))
+print(ggplot(vaf_table, aes(x=VAF_FF, y=VAF_FFPE)) +
+  geom_point(size = 3, alpha = 0.02, col = "violet") +
+  blank)
+dev.off()
 
 
 ### Overlap of variants BY TIER
 
+tier1 <- unique(allvars %>% filter(PATIENT_ID == "200000306", tier == "TIER1") %>% .$KEY)
+tier2 <- unique(allvars %>% filter(PATIENT_ID == "200000306", tier == "TIER2") %>% .$KEY)
+tier3 <- unique(allvars %>% filter(PATIENT_ID == "200000306", tier == "TIER3") %>% .$KEY)
 
+vaf_table$TIER <- "NONE"
+vaf_table[vaf_table$KEY %in% tier1,]$TIER <- "TIER1"
+vaf_table[vaf_table$KEY %in% tier2,]$TIER <- "TIER2"
+vaf_table[vaf_table$KEY %in% tier3,]$TIER <- "TIER3"
 
+pdf(file = paste0("./Plots/Purity_VAF/200000306_VAF_tier123.pdf"))
+print(ggplot(vaf_table %>% filter(TIER != "NONE"), aes(x=VAF_FF, y=VAF_FFPE, col = factor(TIER))) +
+        geom_point(size = 3, alpha = 0.5) +
+        blank)
+dev.off()
 
 
 
 #########  QC metrics correlation plots #########
 
+# Mark BRC pilot samples
+table(SNV_summary$CENTER_CODE, exclude = NULL)
+SNV_summary$CENTER_CODE <- as.character(SNV_summary$CENTER_CODE)
+SNV_summary[is.na(SNV_summary$CENTER_CODE),]$CENTER_CODE <- "BRC"
+
+SNV_summary_R_10$CENTER_CODE <- as.character(SNV_summary_R_10$CENTER_CODE)
+SNV_summary_R_10[is.na(SNV_summary_R_10$CENTER_CODE),]$CENTER_CODE <- "BRC"
+
+
 ### No variant filtering
 
+# RECALL of FF by AT dropout/coverage homogeneity, chim reads, mapping rate of FFPE, etc
+ggplot(SNV_summary, aes(x = RECALL, y = FFPE_AT_DROP, col = factor(CENTER_CODE))) + geom_jitter() + regr_line + labs(x = "Percent Recall of FF", y = "FFPE AT Dropout") + theme(legend.title=element_blank())
+cor(SNV_summary$RECALL, SNV_summary$FFPE_AT_DROP, method = "spearman")  # 0.01094204
+
+ggplot(SNV_summary, aes(x = RECALL, y = FFPE_COVERAGE_HOMOGENEITY, col = factor(CENTER_CODE))) + geom_jitter() + regr_line + labs(x = "Percent Recall of FF", y = "FFPE Unevenness of Coverage") + theme(legend.title=element_blank())
+cor(SNV_summary$RECALL, SNV_summary$FFPE_COVERAGE_HOMOGENEITY, method = "spearman")  # 0.06393162
+
+ggplot(SNV_summary, aes(x = RECALL, y = FFPE_CHIMERIC_PER, col = factor(CENTER_CODE))) + geom_jitter() + regr_line + labs(x = "Percent Recall of FF", y = "FFPE % Chimeric") + theme(legend.title=element_blank())
+cor(SNV_summary$RECALL, SNV_summary$FFPE_CHIMERIC_PER, method = "spearman")  # -0.08038311
+
+ggplot(SNV_summary, aes(x = RECALL, y = FFPE_MAPPING_RATE_PER, col = factor(CENTER_CODE))) + geom_jitter() + regr_line + labs(x = "Percent Recall of FF", y = "FFPE Mapping Rate") + theme(legend.title=element_blank())
+cor(SNV_summary$RECALL, SNV_summary$FFPE_MAPPING_RATE_PER, method = "spearman")  # 0.07213675
+
+ggplot(SNV_summary, aes(x = RECALL, y = FFPE_DEAMINATION_MISMATCHES_PER, col = factor(CENTER_CODE))) + geom_jitter() + regr_line + labs(x = "Percent Recall of FF", y = "FFPE Deamination Mismatches") + theme(legend.title=element_blank())
+cor(SNV_summary$RECALL, SNV_summary$FFPE_DEAMINATION_MISMATCHES_PER, method = "spearman")  # -0.1070085
+
+ggplot(SNV_summary, aes(x = RECALL, y = FFPE_TUMOUR_PURITY, col = factor(TumorType))) + geom_jitter() + labs(x = "Percent Recall of FF", y = "FFPE Tumour Purity")  + theme(legend.title=element_blank()) + regr_line
+cor(SNV_summary$RECALL, SNV_summary$FFPE_TUMOUR_PURITY, method = "spearman")  # -0.3930165
+
+
+# PRECISION of FF by AT dropout/coverage homogeneity, chim reads, mapping rate of FFPE, etc
+ggplot(SNV_summary, aes(x = PRECISION, y = FFPE_AT_DROP, col = factor(CENTER_CODE))) + geom_jitter() + regr_line + labs(x = "Precision", y = "FFPE AT Dropout") + theme(legend.title=element_blank())
+cor(SNV_summary$PRECISION, SNV_summary$FFPE_AT_DROP, method = "spearman")  # -0.3135579
+
+ggplot(SNV_summary, aes(x = PRECISION, y = FFPE_COVERAGE_HOMOGENEITY, col = factor(CENTER_CODE))) + geom_jitter() + regr_line + labs(x = "Precision", y = "FFPE Unevenness of Coverage") + theme(legend.title=element_blank())
+cor(SNV_summary$PRECISION, SNV_summary$FFPE_COVERAGE_HOMOGENEITY, method = "spearman")  # -0.3996581
+
+ggplot(SNV_summary, aes(x = PRECISION, y = FFPE_CHIMERIC_PER, col = factor(CENTER_CODE))) + geom_jitter() + regr_line + labs(x = "Precision", y = "FFPE % Chimeric") + theme(legend.title=element_blank())
+cor(SNV_summary$PRECISION, SNV_summary$FFPE_CHIMERIC_PER, method = "spearman")  # -0.04241492
+
+ggplot(SNV_summary, aes(x = PRECISION, y = FFPE_MAPPING_RATE_PER, col = factor(CENTER_CODE))) + geom_jitter() + regr_line + labs(x = "Precision", y = "FFPE Mapping Rate") + theme(legend.title=element_blank())
+cor(SNV_summary$PRECISION, SNV_summary$FFPE_MAPPING_RATE_PER, method = "spearman")  # 0.2205128
+
+ggplot(SNV_summary, aes(x = PRECISION, y = FFPE_DEAMINATION_MISMATCHES_PER, col = factor(CENTER_CODE))) + geom_jitter() + regr_line + labs(x = "Precision", y = "FFPE Deamination Mismatches") + theme(legend.title=element_blank())
+cor(SNV_summary$PRECISION, SNV_summary$FFPE_DEAMINATION_MISMATCHES_PER, method = "spearman")  # 0.04820513
+
+ggplot(SNV_summary, aes(x = PRECISION, y = FFPE_TUMOUR_PURITY, col = factor(TumorType))) + geom_jitter() + labs(x = "Precision", y = "FFPE Tumour Purity")  + theme(legend.title=element_blank()) + regr_line
+cor(SNV_summary$PRECISION, SNV_summary$FFPE_TUMOUR_PURITY, method = "spearman")  # -0.4334136
+
+
+
+
 ### FFPE recurrent variants, mean VAF < 0.1 removed
+
+# RECALL of FF by AT dropout/coverage homogeneity, chim reads, mapping rate of FFPE, etc
+ggplot(SNV_summary_R_10, aes(x = RECALL, y = FFPE_AT_DROP, col = factor(CENTER_CODE))) + geom_jitter() + regr_line + labs(x = "Percent Recall of FF", y = "FFPE AT Dropout") + theme(legend.title=element_blank())
+cor(SNV_summary_R_10$RECALL, SNV_summary_R_10$FFPE_AT_DROP, method = "spearman")  # 0.01094204
+
+ggplot(SNV_summary_R_10, aes(x = RECALL, y = FFPE_COVERAGE_HOMOGENEITY, col = factor(CENTER_CODE))) + geom_jitter() + regr_line + labs(x = "Percent Recall of FF", y = "FFPE Unevenness of Coverage") + theme(legend.title=element_blank())
+cor(SNV_summary_R_10$RECALL, SNV_summary_R_10$FFPE_COVERAGE_HOMOGENEITY, method = "spearman")  # 0.06393162
+
+ggplot(SNV_summary_R_10, aes(x = RECALL, y = FFPE_CHIMERIC_PER, col = factor(CENTER_CODE))) + geom_jitter() + regr_line + labs(x = "Percent Recall of FF", y = "FFPE % Chimeric") + theme(legend.title=element_blank())
+cor(SNV_summary_R_10$RECALL, SNV_summary_R_10$FFPE_CHIMERIC_PER, method = "spearman")  # -0.08038311
+
+ggplot(SNV_summary_R_10, aes(x = RECALL, y = FFPE_MAPPING_RATE_PER, col = factor(CENTER_CODE))) + geom_jitter() + regr_line + labs(x = "Percent Recall of FF", y = "FFPE Mapping Rate") + theme(legend.title=element_blank())
+cor(SNV_summary_R_10$RECALL, SNV_summary_R_10$FFPE_MAPPING_RATE_PER, method = "spearman")  # 0.07213675
+
+ggplot(SNV_summary_R_10, aes(x = RECALL, y = FFPE_DEAMINATION_MISMATCHES_PER, col = factor(CENTER_CODE))) + geom_jitter() + regr_line + labs(x = "Percent Recall of FF", y = "FFPE Deamination Mismatches") + theme(legend.title=element_blank())
+cor(SNV_summary_R_10$RECALL, SNV_summary_R_10$FFPE_DEAMINATION_MISMATCHES_PER, method = "spearman")  # -0.1070085
+
+ggplot(SNV_summary_R_10, aes(x = RECALL, y = FFPE_TUMOUR_PURITY, col = factor(TumorType))) + geom_jitter() + labs(x = "Percent Recall of FF", y = "FFPE Tumour Purity")  + theme(legend.title=element_blank()) + regr_line
+cor(SNV_summary_R_10$RECALL, SNV_summary_R_10$FFPE_TUMOUR_PURITY, method = "spearman")  # -0.3930165
+
+
+
+
+# PRECISION of FF by AT dropout/coverage homogeneity, chim reads, mapping rate of FFPE, etc
+ggplot(SNV_summary_R_10, aes(x = PRECISION, y = FFPE_AT_DROP, col = factor(CENTER_CODE))) + geom_jitter() + regr_line + labs(x = "Precision", y = "FFPE AT Dropout") + theme(legend.title=element_blank())
+cor(SNV_summary_R_10$PRECISION, SNV_summary_R_10$FFPE_AT_DROP, method = "spearman")  # -0.3135579
+
+ggplot(SNV_summary_R_10, aes(x = PRECISION, y = FFPE_COVERAGE_HOMOGENEITY, col = factor(CENTER_CODE))) + geom_jitter() + regr_line + labs(x = "Precision", y = "FFPE Unevenness of Coverage") + theme(legend.title=element_blank())
+cor(SNV_summary_R_10$PRECISION, SNV_summary_R_10$FFPE_COVERAGE_HOMOGENEITY, method = "spearman")  # -0.3996581
+
+ggplot(SNV_summary_R_10, aes(x = PRECISION, y = FFPE_CHIMERIC_PER, col = factor(CENTER_CODE))) + geom_jitter() + regr_line + labs(x = "Precision", y = "FFPE % Chimeric") + theme(legend.title=element_blank())
+cor(SNV_summary_R_10$PRECISION, SNV_summary_R_10$FFPE_CHIMERIC_PER, method = "spearman")  # -0.04241492
+
+ggplot(SNV_summary_R_10, aes(x = PRECISION, y = FFPE_MAPPING_RATE_PER, col = factor(CENTER_CODE))) + geom_jitter() + regr_line + labs(x = "Precision", y = "FFPE Mapping Rate") + theme(legend.title=element_blank())
+cor(SNV_summary_R_10$PRECISION, SNV_summary_R_10$FFPE_MAPPING_RATE_PER, method = "spearman")  # 0.2205128
+
+ggplot(SNV_summary_R_10, aes(x = PRECISION, y = FFPE_DEAMINATION_MISMATCHES_PER, col = factor(CENTER_CODE))) + geom_jitter() + regr_line + labs(x = "Precision", y = "FFPE Deamination Mismatches") + theme(legend.title=element_blank())
+cor(SNV_summary_R_10$PRECISION, SNV_summary_R_10$FFPE_DEAMINATION_MISMATCHES_PER, method = "spearman")  # 0.04820513
+
+ggplot(SNV_summary_R_10, aes(x = PRECISION, y = FFPE_TUMOUR_PURITY, col = factor(TumorType))) + geom_jitter() + labs(x = "Precision", y = "FFPE Tumour Purity")  + theme(legend.title=element_blank()) + regr_line
+cor(SNV_summary_R_10$PRECISION, SNV_summary_R_10$FFPE_TUMOUR_PURITY, method = "spearman")  # -0.4334136
+
+
+
+
+############### Analysing well performing samples ############### 
+
+summary(SNV_summary_R_10 %>% filter(RECALL > 0.75 & PRECISION > 0.75))
+SNV_summary_R_10 %>% filter(RECALL > 0.75 & PRECISION > 0.75) %>% select(PATIENT_ID, TumorType, FF_TUMOUR_PURITY, FFPE_TUMOUR_PURITY, FFPE_AT_DROP, FFPE_COVERAGE_HOMOGENEITY)
+
+# Recall and precision colored by various FFPE metrics
+ggplot(SNV_summary_R_10, aes(x = RECALL, y = PRECISION, col = factor(RECALL > 0.75 & PRECISION > 0.75))) + geom_jitter() + labs(x = "Recall", y = "Precision")  + theme(legend.title=element_blank()) + regr_line
+ggplot(SNV_summary_R_10, aes(x = RECALL, y = PRECISION, col = TumorType)) + geom_jitter() + labs(x = "Recall", y = "Precision")  + theme(legend.title=element_blank()) + regr_line
+ggplot(SNV_summary_R_10, aes(x = RECALL, y = PRECISION, col = FFPE_AT_DROP)) + geom_jitter() + labs(x = "Recall", y = "Precision")  + theme(legend.title=element_blank()) + regr_line
+ggplot(SNV_summary_R_10, aes(x = RECALL, y = PRECISION, col = FFPE_COVERAGE_HOMOGENEITY)) + geom_jitter() + labs(x = "Recall", y = "Precision")  + theme(legend.title=element_blank()) + regr_line
+ggplot(SNV_summary_R_10, aes(x = RECALL, y = PRECISION, col = FFPE_TUMOUR_PURITY)) + geom_jitter() + labs(x = "Recall", y = "Precision")  + theme(legend.title=element_blank()) + regr_line
+ggplot(SNV_summary_R_10, aes(x = RECALL, y = PRECISION, col = FF_TUMOUR_PURITY)) + geom_jitter() + labs(x = "Recall", y = "Precision")  + theme(legend.title=element_blank()) + regr_line
+ggplot(SNV_summary_R_10, aes(x = RECALL, y = PRECISION, col = FFPE_DEAMINATION_MISMATCHES_PER)) + geom_jitter() + labs(x = "Recall", y = "Precision")  + theme(legend.title=element_blank()) + regr_line
+
+
+# Samples performing particularly badly
+SNV_summary_R_10 %>% filter(RECALL < 0.3 & PRECISION < 0.3) %>% select(PATIENT_ID, TumorType, FF_TUMOUR_PURITY, FFPE_TUMOUR_PURITY, FFPE_AT_DROP, FFPE_COVERAGE_HOMOGENEITY)
+
 
 
 
