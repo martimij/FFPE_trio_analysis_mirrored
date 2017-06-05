@@ -6,6 +6,7 @@
 
 library(dplyr)
 library(jsonlite)
+library(data.table)
 
 # Working directory on the HPC
 setwd("/home/mmijuskovic/FFPE_trio_analysis/SNV_trio_comparison")
@@ -20,6 +21,8 @@ today <- Sys.Date()
 # Load the manifest (HPC)
 QC_portal_trios <- read.csv("/home/mmijuskovic/FFPE_trio_analysis/QC_all62_FFPE_trios_clean.csv")  # all 62 trios
 # QC_portal_trios <- read.csv("./Data/QC_portal_trios_final.csv") # local
+# QC_portal_trios <- read.csv("/home/mmijuskovic/FFPE_trio_analysis/QC_all62_FFPE_trios_clean_withPaths.csv")  # already subset, containing VCF & JSON paths
+# QC_portal_trios$json_path <- as.character(QC_portal_trios$json_path)  # It reads in as factor, causing errors downstream
 
 # Subset for FF and FFPE samples
 QC_portal_trios <- QC_portal_trios %>% filter(SAMPLE_TYPE %in% c("FF", "FFPE"))
@@ -61,7 +64,9 @@ compareSNV <- function(patientID, var_freq = NULL){
   ff_json <- fromJSON(ff_path, flatten = T)
   ff <- ff_json %>% dplyr::select(
     reportedVariantCancer.chromosome, reportedVariantCancer.position, reportedVariantCancer.reference, reportedVariantCancer.alternate, 
-    reportedVariantCancer.VAF)
+    reportedVariantCancer.VAF, somaticOrGermline)
+  # Reduce to somatic, remove that column
+  ff <- ff %>% filter(somaticOrGermline == "somatic") %>% dplyr::select(-(somaticOrGermline))
   ff$tier <- sapply(1:dim(ff)[1], function(x){
     ff_json$reportedVariantCancer.reportEvents[[x]]$tier})
   ff$class <- sapply(1:dim(ff)[1], function(x){
@@ -75,7 +80,9 @@ compareSNV <- function(patientID, var_freq = NULL){
   ffpe_json <- fromJSON(ffpe_path, flatten = T)
   ffpe <- ffpe_json %>% dplyr::select(
     reportedVariantCancer.chromosome, reportedVariantCancer.position, reportedVariantCancer.reference, reportedVariantCancer.alternate, 
-    reportedVariantCancer.VAF)
+    reportedVariantCancer.VAF, somaticOrGermline)
+  # Reduce to somatic, remove that column
+  ffpe <- ffpe %>% filter(somaticOrGermline == "somatic") %>% dplyr::select(-(somaticOrGermline))
   ffpe$tier <- sapply(1:dim(ffpe)[1], function(x){
     ffpe_json$reportedVariantCancer.reportEvents[[x]]$tier})
   ffpe$class <- sapply(1:dim(ffpe)[1], function(x){
@@ -156,5 +163,55 @@ lapply(freq, function(x){
 
 
 # NOTE that file "allFreq" and "0" are slightly different
+allFreq <- read.csv("./Data/SNV/SNV_summary_62trios_allFreq_2017-06-05.csv")
+zeroFreq <- read.csv("./Data/SNV/SNV_summary_62trios_0_2017-06-05.csv")
+allFreq == zeroFreq
+# > allFreq %>% filter(PATIENT_ID == "200000312")
+# FF_TOTAL FFPE_TOTAL OVERLAP FF_UNIQ FFPE_UNIQ    RECALL PRECISION PATIENT_ID
+# 1       36        107      19      17        88 0.5277778 0.1775701  200000312
+# > zeroFreq  %>% filter(PATIENT_ID == "200000312")
+# FF_TOTAL FFPE_TOTAL OVERLAP FF_UNIQ FFPE_UNIQ    RECALL PRECISION PATIENT_ID
+# 1       35        107      18      17        89 0.5142857 0.1682243  200000312
+# > allFreq %>% filter(PATIENT_ID == "200000335")
+# FF_TOTAL FFPE_TOTAL OVERLAP FF_UNIQ FFPE_UNIQ    RECALL PRECISION PATIENT_ID
+# 1      102        276      66      36       210 0.6470588 0.2391304  200000335
+# > zeroFreq  %>% filter(PATIENT_ID == "200000335")
+# FF_TOTAL FFPE_TOTAL OVERLAP FF_UNIQ FFPE_UNIQ    RECALL PRECISION PATIENT_ID
+# 1      102        275      66      36       209 0.6470588      0.24  200000335
+
+# Finding the source of discrepancy in patient 200000312
+all_200000312 <- fread("./Data/SNV/200000312_SNVs_.tsv", sep = "\t")
+zero_200000312 <- read.table("./Data/SNV/200000312_SNVs_0.tsv", skip = 1, sep = "\t", colClasses = c("character", "integer", "character", "character", "numeric", rep("character",4)))
+names(zero_200000312) <- names(all_200000312)
+all_equal(all_200000312, zero_200000312 )  # "Different number of rows"
+table(zero_200000312$SAMPLE_TYPE)
+table(all_200000312$SAMPLE_TYPE)
+# Finding the rows missing in FF (but present in FFPE)
+all_200000312[all_200000312$SAMPLE_TYPE == "FF",]$KEY[!all_200000312[all_200000312$SAMPLE_TYPE == "FF",]$KEY %in% zero_200000312[zero_200000312$SAMPLE_TYPE == "FF",]$KEY]
+all_200000312 %>% filter(KEY == "13_20082011_TA_T")
+zero_200000312 %>% filter(KEY == "13_20082011_TA_T")
+
+# Finding the source of discrepancy in patient 200000335
+all_200000335 <- fread("./Data/SNV/200000335_SNVs_.tsv", sep = "\t")
+zero_200000335 <- read.table("./Data/SNV/200000335_SNVs_0.tsv", skip = 1, sep = "\t", colClasses = c("character", "integer", "character", "character", "numeric", rep("character",4)))
+names(zero_200000335) <- names(all_200000335)
+all_equal(all_200000335, zero_200000335)  # "Different number of rows"
+table(zero_200000335$SAMPLE_TYPE)
+table(all_200000335$SAMPLE_TYPE)
+# Finding the rows missing in FFPE (but present in FF)
+all_200000335[all_200000335$SAMPLE_TYPE == "FFPE",]$KEY[!all_200000335[all_200000335$SAMPLE_TYPE == "FFPE",]$KEY %in% zero_200000335[zero_200000335$SAMPLE_TYPE == "FFPE",]$KEY]
+all_200000335 %>% filter(KEY == "1_21480128_T_C")  # extra variant in FFPE, VAF = 0
+zero_200000335 %>% filter(KEY == "1_21480128_T_C")
+
+
+# CONCLUSION: 
+# Looking at the original and normalized VCF, it became clear that this is a Illumina's subtraction bug. 
+# The indel variant has read depth reported in the "TAR" format field instead of "TIR" (another bug). 
+# Since this is an indel, and TIR is zero, our calculated VAF is zero.
+# The other variant has filtered depth of zero in germline and only 5 in somatic. It should't PASS.
+# Issue needs to be reported to Illumina.
+# I will only use files with VAF > 0 for FF/FFPE comparisons.
+
+
 
 
