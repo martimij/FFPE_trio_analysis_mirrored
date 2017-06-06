@@ -311,7 +311,7 @@ write.table(result, file = paste0(today, "_62_FFPEtrios_SV_all", ".tsv"), row.na
 ######### Check and clean SVs ######### 
 
 # Read in the result
-result <- read.table("2017-03-22_62_FFPEtrios_SV_all.tsv", sep = "\t", header = T)
+result <- read.table("./Data/SV/2017-03-22_62_FFPEtrios_SV_all.tsv", sep = "\t", header = T)
 result$PATIENT_ID <- as.character(result$PATIENT_ID)
 
 # Sanity check & summary
@@ -322,7 +322,6 @@ table(result$CONCORDANT, result$SVTYPE)
 table(result$FF, result$SVTYPE)
 table(result$FILTER, result$SVTYPE)
 table(result$ColocalizedCanvas, result$FILTER)
-
 
 # Subset to filtered only
 result_fil <- result %>% filter(FILTERED == 0)
@@ -447,13 +446,14 @@ table(result[result$FF == "FFPE",]$FILTER2, result[result$FF == "FFPE",]$SVTYPE)
 ############ Filter SVs ############ 
 
 ### Remove 4 recurrent SVs and plot recall/precision per patient
-result_filt <- result %>% filter(FILTERED == 0, !(KEY %in% recurr_KEYs))  # 260 left
+#result_filt <- result %>% filter(FILTERED == 0, !(KEY %in% recurr_KEYs))  # 260 left
+result_filt <- result %>% filter(FILTERED == 0)   #---- started here June 6 2017
 
 # Keep only one BND mate
 result_filt <- result_filt[!duplicated(result_filt$MAIN_ID),]
 
 # Add TUMOR TYPE
-result_filt$TumorType <- QC_portal_trios[match(result_filt$PATIENT_ID, QC_portal_trios$PATIENT_ID),]$TumorType
+result_filt$TumorType <- QC[match(result_filt$PATIENT_ID, QC$PATIENT_ID),]$TumorType
 
 
 
@@ -462,22 +462,22 @@ result_filt$TumorType <- QC_portal_trios[match(result_filt$PATIENT_ID, QC_portal
 
 
 
-# List unique SVs to be reviewed manually (51 total)
-result_filt[(!duplicated(result_filt$KEY)),] %>% dplyr::select(PATIENT_ID, TumorType, FF, KEY, MATE_KEY, ID, SVLEN, CIGAR, HOMLEN, LEFT_SVINSSEQ, RIGHT_SVINSSEQ, SOMATICSCORE, PR_ALT, SR_ALT, CONCORDANT)
-#write.table((result_filt[(!duplicated(result_filt$KEY)),] %>% dplyr::select(PATIENT_ID, TumorType, FF, KEY, MATE_KEY, ID, SVLEN, CIGAR, HOMLEN, LEFT_SVINSSEQ, RIGHT_SVINSSEQ, SOMATICSCORE, PR_ALT, SR_ALT, CONCORDANT)), quote = F, row.names = F, sep = "\t", file = "HighConf_SVs_FFPE_trios.tsv")
-
-# Total unique SVs
-length(unique(result_filt$KEY))  # 51
-# Table of concordance vs SVTYPE (note that concordant SV number is half of the number listed)
-table(result_filt$CONCORDANT, result_filt$SVTYPE)
-# Discordant SVs by sample type
-table(result_filt[result_filt$CONCORDANT == 0,]$FF, result_filt[result_filt$CONCORDANT ==0,]$SVTYPE)
-# Total FF SVs
-table(result_filt$FF)
-# Total concordant
-table(result_filt$CONCORDANT, result_filt$FF)
-# Total patients with any high confidence SV calls
-length(unique(result_filt$PATIENT_ID))  # 19
+# # List unique SVs to be reviewed manually (51 total)
+# result_filt[(!duplicated(result_filt$KEY)),] %>% dplyr::select(PATIENT_ID, TumorType, FF, KEY, MATE_KEY, ID, SVLEN, CIGAR, HOMLEN, LEFT_SVINSSEQ, RIGHT_SVINSSEQ, SOMATICSCORE, PR_ALT, SR_ALT, CONCORDANT)
+# #write.table((result_filt[(!duplicated(result_filt$KEY)),] %>% dplyr::select(PATIENT_ID, TumorType, FF, KEY, MATE_KEY, ID, SVLEN, CIGAR, HOMLEN, LEFT_SVINSSEQ, RIGHT_SVINSSEQ, SOMATICSCORE, PR_ALT, SR_ALT, CONCORDANT)), quote = F, row.names = F, sep = "\t", file = "HighConf_SVs_FFPE_trios.tsv")
+# 
+# # Total unique SVs
+# length(unique(result_filt$KEY))  # 51
+# # Table of concordance vs SVTYPE (note that concordant SV number is half of the number listed)
+# table(result_filt$CONCORDANT, result_filt$SVTYPE)
+# # Discordant SVs by sample type
+# table(result_filt[result_filt$CONCORDANT == 0,]$FF, result_filt[result_filt$CONCORDANT ==0,]$SVTYPE)
+# # Total FF SVs
+# table(result_filt$FF)
+# # Total concordant
+# table(result_filt$CONCORDANT, result_filt$FF)
+# # Total patients with any high confidence SV calls
+# length(unique(result_filt$PATIENT_ID))  # 19
 
 
 ### Put all data together (QC, SV)
@@ -497,14 +497,15 @@ SV_summary$PRECISION <- SV_summary$OVERLAP / SV_summary$TOTAL_FFPE
 
   
 # Add QC details to the SV summary table
-QC_table <- QC_portal_trios %>% filter(SAMPLE_TYPE == "FFPE") %>% dplyr::select(PATIENT_ID, CENTER_CODE, TumorType, SAMPLE_WELL_ID, TUMOUR_PURITY, GC_DROP, AT_DROP, COVERAGE_HOMOGENEITY, CHIMERIC_PER, AV_FRAGMENT_SIZE_BP, MAPPING_RATE_PER)
+QC_table <- QC %>% filter(SAMPLE_TYPE == "FFPE") %>% dplyr::select(PATIENT_ID, CENTER_CODE, TumorType, SAMPLE_WELL_ID, TUMOUR_PURITY, GC_DROP, AT_DROP, COVERAGE_HOMOGENEITY, CHIMERIC_PER, AV_FRAGMENT_SIZE_BP, MAPPING_RATE_PER)
 names(QC_table)[4:11] <- paste0("FFPE_", names(QC_table)[4:11])
-QC_table <- left_join(QC_table, (QC_portal_trios %>% filter(SAMPLE_TYPE == "FF") %>% dplyr::select(PATIENT_ID, SAMPLE_WELL_ID, LIBRARY_TYPE, TUMOUR_PURITY, GC_DROP, AT_DROP, COVERAGE_HOMOGENEITY, CHIMERIC_PER, AV_FRAGMENT_SIZE_BP, MAPPING_RATE_PER)), by = "PATIENT_ID")
+QC_table <- left_join(QC_table, (QC %>% filter(SAMPLE_TYPE == "FF") %>% dplyr::select(PATIENT_ID, SAMPLE_WELL_ID, LIBRARY_TYPE, TUMOUR_PURITY, GC_DROP, AT_DROP, COVERAGE_HOMOGENEITY, CHIMERIC_PER, AV_FRAGMENT_SIZE_BP, MAPPING_RATE_PER)), by = "PATIENT_ID")
 names(QC_table)[12:20] <- paste0("FF_", names(QC_table)[12:20])
+QC_table$PATIENT_ID <- as.character(QC_table$PATIENT_ID)
 SV_summary <- left_join(SV_summary, QC_table, by = "PATIENT_ID")
 
 # Write the full table
-write.csv(SV_summary, file = paste0("Full_SV_summary_", today, ".csv"), row.names = F, quote = F)
+write.csv(SV_summary, file = paste0("./Data/SV/Full_SV_summary_", today, ".csv"), row.names = F, quote = F)
 
 
 
@@ -514,11 +515,20 @@ write.csv(SV_summary, file = paste0("Full_SV_summary_", today, ".csv"), row.name
 # Barplots of overlapping and unique SVs (normalized) for all 19 trios with SV calls
 # First recast the data (each of 3 bp values in separate row, with PATIENT_ID, with indexes 1-2-3), needs package "reshape"
 SV_summary_m <- as.data.frame(t(SV_summary %>% dplyr::select(PATIENT_ID, OVERLAP, FF_ONLY, FFPE_ONLY)))
-names(SV_summary_m) <- SV_summary_m[1,]
+names(SV_summary_m) <- as.matrix(SV_summary_m[1,])
 SV_summary_m <- SV_summary_m[2:4,]
 SV_summary_m <- melt(cbind(SV_summary_m, ind = rownames(SV_summary_m)), id.vars = c('ind'))
+
 # Plot (needs package "scales")
-ggplot(SV_summary_m, aes(x = variable, y = value, fill = ind)) + geom_bar(position = "fill",stat = "identity") + scale_y_continuous(labels = percent_format()) + theme(axis.text.x=element_text(angle=45,hjust=1,vjust=1), axis.title = element_blank()) + theme(legend.title=element_blank()) + labs(x = "Patient ID", y = element_blank()) + blank
+SV_summary_m$value <- as.numeric(SV_summary_m$value)
+pdf(file = paste0("./Plots/Concordance/SV_overlap_all.pdf"))
+print(ggplot(SV_summary_m, aes(x = variable, y = value, fill = ind)) + 
+  geom_bar(position = "fill",stat = "identity") + 
+  scale_y_continuous(labels = percent_format()) + 
+  theme(axis.text.x=element_text(angle=45,hjust=1,vjust=1), axis.title = element_blank()) + 
+  theme(legend.title=element_blank()) + labs(x = "Patient ID", y = element_blank()) + 
+  blank)
+dev.off()
 
 
 
@@ -599,6 +609,16 @@ ggplot(data=SV_summary, aes(x=FF_LIBRARY_TYPE, y=PRECISION)) + geom_boxplot() + 
 # PRECISION by FFPE fragment size
 ggplot(SV_summary, aes(x = PRECISION, y = FFPE_AV_FRAGMENT_SIZE_BP, col = factor(TumorType))) + geom_jitter() + labs(x = "Precision", y = "FFPE Fragment Size") + theme(legend.title=element_blank()) + regr_line
 cor(SV_summary[complete.cases(SV_summary),]$PRECISION, SV_summary[complete.cases(SV_summary),]$FFPE_AV_FRAGMENT_SIZE_BP, method = "spearman")  # -0.4822574
+
+
+# ### Read support for unfiltered SVs
+# ggplot(result, aes(x=factor(SVTYPE), y=PR_ALT, fill = factor(FF))) + 
+#   #geom_boxplot(aes(colour = factor(FF))) + 
+#   geom_jitter() +
+#   theme(axis.title.x = element_blank()) + 
+#   ggtitle("Supporting Paired Reads") +
+#   blank
+
 
 
 ### Read support for high confidence SVs
